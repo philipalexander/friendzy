@@ -1,0 +1,11 @@
+{
+  "extends": "stripe-app.json",
+  "ui_extension": {
+    "content_security_policy": {
+      "connect-src": ["https://localhost:8080"]
+    }
+  },
+  "constants": {
+    "API_BASE": "https://localhost:8080/v1"
+  }
+}

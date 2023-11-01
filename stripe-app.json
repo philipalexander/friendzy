@@ -1,0 +1,59 @@
+{
+  "id": "com.example.refer-a-friend",
+  "version": "0.0.1",
+  "name": "Friendzy",
+  "icon": "",
+  "permissions": [
+    {
+      "permission": "coupon_read",
+      "purpose": ""
+    },
+    {
+      "permission": "coupon_write",
+      "purpose": ""
+    },
+    {
+      "permission": "promotion_code_read",
+      "purpose": ""
+    },
+    {
+      "permission": "promotion_code_write",
+      "purpose": ""
+    },
+    {
+      "permission": "webhook_read",
+      "purpose": ""
+    },
+    {
+      "permission": "customer_read",
+      "purpose": ""
+    },
+    {
+      "permission": "customer_write",
+      "purpose": ""
+    },
+    {
+      "permission": "secret_write",
+      "purpose": "Allows storing secrets between page reloads"
+    }
+  ],
+  "ui_extension": {
+    "views": [
+      {
+        "viewport": "stripe.dashboard.customer.detail",
+        "component": "App"
+      },
+      {
+        "viewport": "settings",
+        "component": "AppSettings"
+      }
+    ],
+    "content_security_policy": {
+      "connect-src": [
+        "https://api.example.com/v1"
+      ],
+      "image-src": null,
+      "purpose": "Testing"
+    }
+  }
+}
