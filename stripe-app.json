@@ -6,31 +6,31 @@
   "permissions": [
     {
       "permission": "coupon_read",
-      "purpose": ""
+      "purpose": "test"
     },
     {
       "permission": "coupon_write",
-      "purpose": ""
+      "purpose": "test"
     },
     {
       "permission": "promotion_code_read",
-      "purpose": ""
+      "purpose": "test"
     },
     {
       "permission": "promotion_code_write",
-      "purpose": ""
+      "purpose": "test"
     },
     {
       "permission": "webhook_read",
-      "purpose": ""
+      "purpose": "test"
     },
     {
       "permission": "customer_read",
-      "purpose": ""
+      "purpose": "test"
     },
     {
       "permission": "customer_write",
-      "purpose": ""
+      "purpose": "test"
     },
     {
       "permission": "secret_write",
@@ -50,10 +50,10 @@
     ],
     "content_security_policy": {
       "connect-src": [
-        "https://api.example.com/v1"
+        "https://auth.getfriendzy.com/oauth2/"
       ],
       "image-src": null,
-      "purpose": "Testing"
+      "purpose": "Send data to auth service"
     }
   }
 }

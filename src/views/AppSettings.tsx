@@ -1,63 +1,49 @@
 import {
   Box,
-  Button,
   Icon,
-  Img,
-  Inline,
   Link,
   SettingsView,
   SignInView,
-  TextField,
 } from "@stripe/ui-extension-sdk/ui";
 import type { ExtensionContextValue } from "@stripe/ui-extension-sdk/context";
 import {useState, useEffect} from 'react';
 import app_icon from './brand_icon.svg';
-
-import { createHttpClient, STRIPE_API_KEY } from '@stripe/ui-extension-sdk/http_client';
-import Stripe from 'stripe';
 import {createOAuthState} from '@stripe/ui-extension-sdk/utils';
+import { getAuthURL, is_authenticated } from "./util/AuthService";
+import { IUser } from "./util/UserService";
+import ErrorComponent, { ErrorProps } from "./components/error";
+import { process_error } from "./util/error_service";
 
-// Create an instance of a Stripe object to access customer information.
-// You don't need an API Key here, because the app uses the
-// dashboard credentials to make requests.
-const stripe: Stripe = new Stripe(STRIPE_API_KEY, {
-  httpClient: createHttpClient() as Stripe.HttpClient,
-  apiVersion: '2022-11-15',
-});
-
-const clientID = '2s4sl5acj7bou2r38frglj46dv';
-const getRedirectURL = (mode: 'live' | 'test') => `https://dashboard.stripe.com/${
-  mode === 'test' ? 'test/' : ''
-}apps-oauth/com.example.refer-a-friend`;
-const getAuthURL = (state: string, challenge: string, mode: 'live' | 'test') =>
-  `https://auth.friendzy.com/login?response_type=code&client_id=${clientID}&redirect_uri=${getRedirectURL(mode)}&state=${state}&code_challenge=${challenge}&code_challenge_method=S256`;
-
-
-const AppSettings = ({userContext, environment}: ExtensionContextValue) => {
+const AppSettings = ({userContext, environment, oauthContext}: ExtensionContextValue) => {
   const [status, setStatus] = useState('');
-
+  const [auth_url, set_auth_url] = useState('');
+  const [error, set_error] = useState<ErrorProps | null>(null);
+  const [signed_in, set_signed_in] = useState(false);
+  const [friendzy_user, set_friendzy_user] = useState<IUser | null>(null);
   const {mode} = environment;
-  const [authURL, setAuthURL] = useState('');
-  useEffect(() => {
-    console.log('getAuthURL', getAuthURL)
-    createOAuthState().then(({state, challenge}) => {
-      console.log('state', state)
-      console.log('challenge', challenge)
-      // setAuthURL(getAuthURL(state, challenge, mode));
-    });
-  }, [mode]);
 
-  // useEffect(() => {
-  //   stripe.apps.secrets.create({
-  //     scope: { type: 'user', user: userContext.id },
-  //     name: 'friendzy_auth_code',
-  //     payload: 'test_secret',
-  //     expires_at: 1956528000  // optional
-  //   }).then(resp => console.log(resp));
-  // }, []);
-  
-  const isUserSignedIn = false;
+  useEffect(() => {
+    try {
+      is_authenticated({userContext, environment, oauthContext}).then((authenticated_user: any) => {
+        set_signed_in(true)
+        set_friendzy_user({...authenticated_user})
+      }).catch(error => {
+        set_error(process_error(error))
+        set_signed_in(false)
+      })
+
+      createOAuthState().then(({state, challenge}) => { // TODO: maybe this should be it's own effect
+        set_auth_url(getAuthURL(state, challenge, mode));
+      });
+    } catch (error) {
+      set_error(process_error(error))
+      set_signed_in(false)
+    }   
+    
+  }, []);
+ 
   const saveSettings = async (values: any) => {
+    console.log("saveSettings is not implemented");
     try {
       setStatus('Saving...');
       // Extract our fields from the values object. The key is the name attribute of the form element.
@@ -80,70 +66,86 @@ const AppSettings = ({userContext, environment}: ExtensionContextValue) => {
     }
   };
 
-  return isUserSignedIn ? (
-    <SettingsView 
-      onSave={saveSettings}
-      statusMessage={status}>
+  return (
+  <>
+    { error ? <ErrorComponent error_title={error?.error_title} error_message={error?.error_message} type={error?.type} auth_url={auth_url}></ErrorComponent> : null }
+    { signed_in ? <SettingsView /*onSave={saveSettings}*/ statusMessage={status}>
+    Welcome! You're authenticated with your Friendzy account {friendzy_user?.cognito_username}.
 
-      <Box
-        css={{
+    <Box css={{ stack: 'x', gap: 'medium', marginY: 'medium' }}>
+      <Box css={{
           background: "container",
           borderRadius: "medium",
           padding: "large",
         }}>
+        
+        <Box css={{stack: 'x', alignX: 'center'}}><Icon name="check" size="xlarge" css={{ fill: 'success'}} /></Box>
+        <Box>You're authenticated with your Friendzy account {friendzy_user?.email}.</Box>
 
-
-        {/* <Box css={{marginY: 'small'}} >
-          <TextField 
-          label="Email" 
-          description="Your Friendzy account email address" 
-          type="text" 
-          placeholder="Email" 
-          css={{width: 'fill'}} 
-          required={true}
-          />
-        </Box>
-
-        <Box css={{marginY: 'small'}} >
-          <TextField 
-          label="Password" 
-          description="Your Friendzy account password" 
-          type="password" 
-          placeholder="password" 
-          css={{width: 'fill'}} 
-          required={true}
-          />
-        </Box> */}
-
-        To get started, create a Friendzy account of sign into your existing account.
-        <Box css={{ marginBottom: "small" }}>
-          <Button type="primary">Create Account</Button>
-        </Box>
-
-        <Link
-          target="_blank"
-          href={"https://stripe.com/docs/stripe-apps/build-test-views#add-application-settings"}
-        >
+        <Link target="_blank" href={"https://getfriendzy.com/#"} >
           <Box css={{ marginTop: "medium" }}>
-            Or sign in to your existing Friendzy account{" "}
+            Log in to your Friendzy account to manage your billing{" "}
             <Icon name="arrowRight" size="xsmall" />
           </Box>
         </Link>
 
       </Box>
-    </SettingsView>
-  ) : (
-    <SignInView
-      description="Connect your SuperTodo account with Stripe."
-      primaryAction={{label: 'Sign in', href: authURL}}
-      footerContent={
-        <>
-          Don't have an account? <Link href={"authURL"}>Sign up</Link>
+      <Box css={{
+          background: "container",
+          borderRadius: "medium",
+          padding: "large",
+        }}>
+        { friendzy_user?.stripe_connect_id  ? 
+        <><Box css={{stack: 'x', alignX: 'center'}}><Icon name="check" size="xlarge" css={{ fill: 'success'}} /></Box>
+        
+        <Box>You've connected a Stripe account to Friendzy: {friendzy_user?.stripe_connect_id}</Box>
+
+        <Link target="_blank" href={"https://getfriendzy.com/#"} >
+          <Box css={{ marginTop: "medium" }}>
+            Log into your Friendzy account to authenticate a different Stripe account{" "}
+            <Icon name="arrowRight" size="xsmall" />
+          </Box>
+        </Link>
         </>
-      }
-      brandColor="#635bff"
-      brandIcon={app_icon}
-    />
+        : <><Box css={{stack: 'x', alignX: 'center'}}><Icon name="cancelCircle" size="xlarge" css={{ fill: 'critical'}} /></Box>
+        
+        <Box>You've don't have a Stripe account connected to Friendzy. To apply the account credit when a referral is made, you'll need to authorize Friendzy to receive webhooks from your Stripe account.</Box>
+
+        <Link target="_blank" href={"https://getfriendzy.com/#"} >
+          <Box css={{ marginTop: "medium" }}>
+            Log into your Friendzy account to authenticate a Stripe account{" "}
+            <Icon name="arrowRight" size="xsmall" />
+          </Box>
+        </Link></>}
+
+        <Link target="_blank" href={"https://getfriendzy.com/#"} >
+          <Box css={{ marginTop: "medium" }}>
+            Read more about why Friendzy needs to connect to your Stripe account{" "}
+            <Icon name="arrowRight" size="xsmall" />
+          </Box>
+        </Link>
+
+      </Box>
+    </Box>
+      
+    </SettingsView>
+   : 
+    <>
+      { auth_url ? <SignInView
+        description="Connect your Friendzy account with Stripe."
+        primaryAction={{label: 'Sign in', href: auth_url}}
+        footerContent={
+          <>
+            Don't have an account? <Link href={auth_url}>Sign up</Link>
+          </>
+        }
+        brandColor="#635bff"
+        brandIcon={app_icon}
+      /> : null }
+    </>
+    }
+  </>
+    
   );
 };
 

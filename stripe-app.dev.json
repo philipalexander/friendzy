@@ -2,7 +2,11 @@
   "extends": "stripe-app.json",
   "ui_extension": {
     "content_security_policy": {
-      "connect-src": ["https://localhost:8080"]
+      "connect-src": [
+        "https://localhost:8080", 
+        "https://auth.getfriendzy.com/oauth2/", 
+        "https://k9p06fdan6.execute-api.us-east-1.amazonaws.com/"
+      ]
     }
   },
   "constants": {
