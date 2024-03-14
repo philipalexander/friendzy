@@ -3,7 +3,7 @@ import { ErrorProps } from "../components/error";
 export const process_error = (error: any) => {
   // Log to external server
   // Get user friendly message and title
-  console.log('error', error)
+  console.error(error)
   if (error && error.message === '401') {
     const unauth_error: ErrorProps = {error_title: "Your Authorization has expired", error_message: "Please authorize your Friendzy account", type: "unathorized"}
     return unauth_error;

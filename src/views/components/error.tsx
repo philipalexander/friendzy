@@ -1,5 +1,5 @@
 import {
-  Banner, Button
+  Banner, Box, Button
 } from "@stripe/ui-extension-sdk/ui";
 import { getAuthURL } from "../util/AuthService";
 
@@ -14,14 +14,16 @@ const ErrorComponent = ({ error_title, error_message, type, auth_url }: ErrorPro
   console.error('ErrorComponent', error_title, error_message, type)
   const banner_type = type === 'unathorized' ? 'critical' : type;
   return (
-    <Banner
-      type={banner_type}
-      title={error_title}
-      description={error_message}
-      actions={ type === 'unathorized' ?
-        <Button href={auth_url} target="_blank">Reactivate</Button>
-      : null }
-    />
+    <Box css={{marginY: 'small'}}>
+      <Banner
+        type={banner_type}
+        title={error_title}
+        description={error_message}
+        actions={ type === 'unathorized' ?
+          <Button href={auth_url} target="_blank">Reactivate</Button>
+        : null }
+      />
+    </Box>
 )};
 
 export default ErrorComponent;

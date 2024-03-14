@@ -2,23 +2,28 @@
 
 import { Box, Button, Inline, Table, TableBody, TableCell, TableRow} from "@stripe/ui-extension-sdk/ui";
 import { useState } from "react";
-import { IIncentiveMetadata } from "./CreateIncentive";
+import { ICoupon, IIncentiveMetadata, IPromo, IReward } from "./CreateIncentive";
 import ErrorComponent, { ErrorProps } from "../components/error";
+import Stripe from 'stripe';
 
 type ShowIncentiveProps = {
-  customer: any; // TODO: Stripe probably has a type for this
-  metadata: IIncentiveMetadata;
+  customer: Stripe.Customer ;
+  coupon: ICoupon;
+  promo_codes: IPromo[];
+  reward: IReward;
   on_edit_incentive: () => void;
 };
 
-const ShowIncentive = ({ customer, metadata, on_edit_incentive }: ShowIncentiveProps) => {
+const ShowIncentive = ({ customer, coupon, promo_codes, reward, on_edit_incentive }: ShowIncentiveProps) => {
   const [error, set_error] = useState<ErrorProps | null>(null);
+
+  console.log(customer, coupon, promo_codes, reward)
   // TODO: maybe we should just use the customer metadata instead of passing this in??
-  const [incentive_type, set_incentive_type] = useState(metadata.raf_incentive_type);
-  const [reward_amount, set_reward_amount] = useState(metadata.raf_reward_amount);
-  const [incentive_amount, set_incentive_amount] = useState(metadata.raf_incentive_amount);
-  const [incentive_currency, set_incentive_currency] = useState(metadata.raf_incentive_currency);
-  const [promo_code, set_promo_code] = useState(metadata.raf_promo_code);
+  // const [incentive_type, set_incentive_type] = useState(metadata.raf_incentive_type);
+  // const [reward_amount, set_reward_amount] = useState(metadata.raf_reward_amount);
+  // const [incentive_amount, set_incentive_amount] = useState(metadata.raf_incentive_amount);
+  // const [incentive_currency, set_incentive_currency] = useState(metadata.raf_incentive_currency);
+  // const [promo_code, set_promo_code] = useState(metadata.raf_promo_code);
   
   return (
     <Box css={{marginY: 'medium'}}>
@@ -28,28 +33,30 @@ const ShowIncentive = ({ customer, metadata, on_edit_incentive }: ShowIncentiveP
         <TableBody>
           <TableRow>
             <TableCell>Promotion Code</TableCell>
-            <TableCell>{promo_code}</TableCell>
+            <TableCell>{promo_codes[0]?.code}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Reward</TableCell>
-            <TableCell>{new Intl.NumberFormat("en-US", { style: "currency", currency: metadata.raf_reward_currency ? metadata.raf_reward_currency : 'usd'}).format(parseInt(reward_amount))}</TableCell>
+            <TableCell>{new Intl.NumberFormat("en-US", { style: "currency", currency: reward.reward_currency ? reward.reward_currency : 'usd'}).format(parseInt(reward.reward_amount))}</TableCell>
           </TableRow>
           <TableRow>
             <TableCell>New Customer Incentive</TableCell>
-            {incentive_type === "AMOUNT_OFF" ? <TableCell>{new Intl.NumberFormat("en-US", { style: "currency", currency: incentive_currency ? incentive_currency : 'usd' }).format(parseInt(incentive_amount))}</TableCell> : null }
-            {incentive_type === "PERCENT_OFF" ? <TableCell>{incentive_amount}%</TableCell> : null }
+            {coupon.amount_off ? <TableCell>{new Intl.NumberFormat("en-US", { style: "currency", currency: coupon.currency ? coupon.currency : 'usd' }).format(coupon.amount_off)}</TableCell> : null }
+            {coupon.percent_off ? <TableCell>{coupon.percent_off}%</TableCell> : null }
           </TableRow>
         </TableBody>
       </Table>
 
-
-      <Box css={{marginY: 'medium'}}>When the promotion code 
-        <Inline css={{fontWeight: 'semibold'}}> {promo_code}</Inline> is applied to a customer, 
+      <Box css={{background: "container",
+          borderRadius: "medium",
+          marginY: "medium",
+          padding: "large"}}>When the promotion code 
+        <Inline css={{fontWeight: 'semibold'}}> {promo_codes[0]?.code}</Inline> is applied to a customer, 
         <Inline css={{fontWeight: 'semibold'}}> {customer.name}</Inline> will earn a 
-        <Inline css={{fontWeight: 'semibold'}}> {new Intl.NumberFormat("en-US", { style: "currency", currency: metadata.raf_reward_currency ? metadata.raf_reward_currency : 'usd'}).format(parseInt(reward_amount))}</Inline> account credit 
+        <Inline css={{fontWeight: 'semibold'}}> {new Intl.NumberFormat("en-US", { style: "currency", currency: reward.reward_currency ? reward.reward_currency : 'usd'}).format(parseInt(reward.reward_amount))}</Inline> account credit 
         and the referred customer will receive a discount of 
-        {incentive_type === "AMOUNT_OFF" ? <Inline css={{fontWeight: 'semibold'}}> {new Intl.NumberFormat("en-US", { style: "currency", currency: incentive_currency ? incentive_currency : 'usd' }).format(parseInt(incentive_amount))}</Inline> : null }
-        {incentive_type === "PERCENT_OFF" ? ' '+incentive_amount+'%' : null }.
+        {coupon.amount_off ? <Inline css={{fontWeight: 'semibold'}}> {new Intl.NumberFormat("en-US", { style: "currency", currency: coupon.currency ? coupon.currency : 'usd' }).format(coupon.amount_off)}</Inline> : null }
+        {coupon.percent_off ? ' '+coupon.percent_off+'%' : null }.
       </Box>
     
     <Box css={{marginY: 'medium', textAlign: 'right' }}>

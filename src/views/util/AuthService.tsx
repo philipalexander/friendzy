@@ -26,34 +26,33 @@ export const getAuthURL = (state: string, challenge: string, mode: 'live' | 'tes
   `https://auth.getfriendzy.com/login?response_type=code&client_id=${client_id}&redirect_uri=${getRedirectURL(mode)}&state=${state}&code_challenge=${challenge}&code_challenge_method=S256`;
 
 
-export const is_authenticated = async ({userContext, environment, oauthContext}: ExtensionContextValue) => {
+export const is_authenticated = async ({userContext, environment, oauthContext, appContext}: ExtensionContextValue) => {
   const {id: userID} = userContext;
   const {mode} = environment;
   const code = oauthContext?.code || '';
   const verifier = oauthContext?.verifier || '';
   let friendzy_token: TokenData | null = null;
-
+  console.log('oauthContext', oauthContext)
   // First, if we have an oauthContext from Stripe, then let's get a new token
   // This means that this is a redirect back from friendzy authentication
-  if (code && verifier) { 
+  if (code && verifier && userID) { 
     const token_data = await getTokenFromAuthServer({code, verifier, mode});
     if (token_data && token_data.id_token && token_data.access_token) {
       saveTokenData({userID, tokenData: token_data}); // Save to Stripe Secret Store
       return await get_user(token_data.id_token, token_data.access_token)
     } else { 
-      console.log("check")
       throw new Error('token_data is not what we expect')}
   // Second, this isn't a redirect back so let's look to see if we have a token 
   // in the Stripe Secret Store and try that out.
-  } else if (!friendzy_token) {
+  } else if (!friendzy_token && userID) {
     const token_data = await getTokenFromSecretStore(userID);
     if (token_data && token_data.id_token && token_data.access_token) {
       friendzy_token = token_data;
       const user = await get_user(token_data.id_token, token_data.access_token);
       return user;
-    } else { console.log("check1"); throw new Error('token_data is not the shape we expect')}
+    } else { throw new Error('token_data is not the shape we expect') }
   } else {
-    console.log("we have friendzy_token already somehow")
+    console.error("we have friendzy_token already somehow")
   } 
 }
 

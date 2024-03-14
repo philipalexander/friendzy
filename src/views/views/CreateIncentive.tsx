@@ -6,20 +6,52 @@
 // 
 
 import {Box, Button, FormFieldGroup,  Radio, Select,  TextField, FocusView, ButtonGroup, Icon, Inline, Banner } from "@stripe/ui-extension-sdk/ui";
-import { useEffect, useState } from "react";
-import { add_stripe_metadata_to_customer, check_promo_code_exists, create_stripe_coupon, create_stripe_promo_code, get_stripe_coupon } from "../util/StripeService";
+import { useCallback, useEffect, useReducer, useState } from "react";
+import { add_stripe_metadata_to_customer, check_promo_code_exists, create_stripe_coupon, create_stripe_promo_code, deactivate_stripe_promo_code, delete_stripe_coupon, get_stripe_coupon } from "../util/StripeService";
 import ErrorComponent, { ErrorProps } from "../components/error";
 import { process_error } from "../util/error_service";
 import { showToast } from "@stripe/ui-extension-sdk/utils";
+import CreateEditPromoCode from "../components/promo_code";
+import Stripe from 'stripe';
+import CreateEditReward from "../components/reward_incentive";
+import CreateEditCoupon from "../components/coupon";
+
 
 type CreateIncentiveProps = {
-  shown: boolean;
-  incentive: IIncentiveMetadata;
-  onSave: (structure: IIncentiveStructure) => void;
+  // incentive: IIncentiveMetadata;
+  onSave: () => void;
   onBack: () => void;
+  current_coupon: Stripe.Coupon | null | undefined;
+  current_promo_codes: Stripe.PromotionCode[] | null | undefined;
   userContext: any;
-  environment: any;
+  customer: any;
+  current_reward: IReward | null | undefined;
 };
+
+export interface IReward {
+  reward_amount: string;
+  reward_currency: string;
+  customer_id?: string;
+}
+
+export interface ICoupon {
+  id: string | undefined;
+  amount_off: number | null | undefined;
+  percent_off: number | null | undefined;
+  currency: string | null | undefined;
+}
+
+export interface IPromo {
+  code: string;
+  id?: string;
+  coupon_id?: string;
+}
+
+export interface IIncentive {
+  reward: IReward | null | undefined;
+  coupon: ICoupon | null | undefined;
+  promo_codes: Stripe.PromotionCode[] | null | undefined;
+}
 
 export interface IIncentiveMetadata {
   raf_incentive_type: string;
@@ -39,188 +71,167 @@ export interface IIncentiveStructure {
   promo_code: string;
 }
 
-const confirmCloseMessages = {
-  title: "Your mood will not be saved",
+const confirm_close_messages = {
+  title: "Your changes will not be saved",
   description: "Are you sure you want to exit?",
   cancelAction: "Cancel",
   exitAction: "Exit",
 };
 
-
-const CreateIncentive = ({ shown, incentive, onSave, onBack, userContext, environment }: CreateIncentiveProps) => {
+const CreateIncentive = ({ onSave, onBack, userContext, customer, current_coupon, current_promo_codes, current_reward}: CreateIncentiveProps) => {
   // Dev mode only
-  console.log('shown', shown)
-  console.log('incentive', incentive)
-  console.log('userContext', userContext)
-  console.log('environment', environment)
+  // Get Current Coupon and Promo code
+  // console.log('userContext', userContext)
+  // console.log('customer', customer)
+  // console.log('coupon', current_coupon)
+  // console.log('promo_codes', current_promo_codes)
+  // console.log('reward', current_reward)
+
+  const existing_incentive: IIncentive = {
+    reward: current_reward ? current_reward : null,
+    coupon: current_coupon ? { id: current_coupon?.id, amount_off: current_coupon?.amount_off, percent_off: current_coupon?.percent_off, currency: current_coupon?.currency} : null,
+    promo_codes: current_promo_codes ? current_promo_codes : null
+  }
+  // const friendzy_incentive_type = coupon && coupon.percent_off ? 'PERCENT_OFF' : 'AMOUNT_OFF'
+  // const friendzy_amount_off = coupon && coupon.percent_off ? coupon.percent_off : null
   
-  const [incentive_type, set_incentive_type] = useState(incentive.raf_incentive_type);
-  const [reward_amount, set_reward_amount] = useState(incentive.raf_reward_amount);
-  const [incentive_amount, set_incentive_amount] = useState(incentive.raf_incentive_amount);
-  const [incentive_currency, set_incentive_currency] = useState(incentive.raf_incentive_currency);
-  const [reward_currency, set_reward_currency] = useState(incentive.raf_reward_currency);
-  const [promo_code, set_promo_code] = useState(incentive.raf_promo_code);
-  const [promo_code_exists, update_promo_code_exists] = useState<boolean>();
+  // const [incentive_type, set_incentive_type] = useState(friendzy_incentive_type);
+
+
+  const [reward, set_reward] = useState<IReward | null | undefined>(existing_incentive.reward);
+  const [promo_code, set_promo_code] = useState<IPromo | null | undefined>(existing_incentive.promo_codes ? existing_incentive.promo_codes[0] : null);
+  const [coupon, set_coupon] = useState<ICoupon | null | undefined>(existing_incentive.coupon);
+
+  // const [incentive_amount, set_incentive_amount] = useState(friendzy_amount_off ? friendzy_amount_off : '');
+  // const [incentive_currency, set_incentive_currency] = useState(coupon ? coupon.currency : '');
+  // const [reward_currency, set_reward_currency] = useState(reward ? reward.reward_currency : '');
+  
   const [step, update_step] = useState<number>(1)
-  const [confirmClose, setConfirmClose] = useState<boolean>(false);
   const [error, set_error] = useState<ErrorProps | null>(null);
-  const [coupon, set_coupon] = useState<any | null>(null);
-  const [show_focus, set_show_focus] = useState(shown);
-
+  const [show_focus, set_show_focus] = useState(true);
   
-  useEffect(() => {
-    try {
-      get_stripe_coupon(environment.objectContext.id).then(coupon => set_coupon(coupon))
-    } catch (error) {
-      set_error(process_error(error))
-    }
-    
-  }, []); 
+  
 
-  async function check_promo_code_exists_handler(entered_code: string) {
-    try {
-      const code_res = await check_promo_code_exists(entered_code)
-      if (code_res.data.length > 0) {update_promo_code_exists(true)} 
-      else {update_promo_code_exists(false)}
-    } catch (err) {
-      set_error(process_error(err))
-    }
-  }
-
-  function update_step_handler(step: number, change: -1 | 1) {
-    if (step <= 1) {
-      console.log('go back to prior view')
+  function update_step_handler(current_step: number, destination_step: number) {
+    // if (current_step === 1 && promo_invalid) {
+    //   showToast("This promotion code is invalid", {type: "caution"})
+    //   return;
+    // }
+    // if (current_step === 1 && promo_code ===)
+    if (destination_step < 1) {
       set_show_focus(false)
-    } else if (step > 2) {
-      console.log('lets actually save the form now')
+      onBack();
+    } else if (step > 3) {
+      showToast("There is no step 4", {type: "caution"})
     }
-    update_step(step+change)
+    update_step(destination_step)
   }
 
-  async function save_incentive_structure(coupon: any, structure: IIncentiveStructure) {
-    console.log('structure', structure)
-    console.log('coupon', coupon)
+  async function save_incentive_structure(existing_incentive: IIncentive, reward: IReward, promo_code: IPromo, coupon: ICoupon, customer_id: string) {
     try {
-      const customer_id = environment.objectContext?.id || '';
-      const incentive_structure = structure;
-      const coupon = await create_stripe_coupon(customer_id, incentive_structure)
-      console.log('coupon', coupon)
-   
-      const promo_code = await create_stripe_promo_code(coupon.id, incentive_structure.promo_code)
-      console.log('promo_code', promo_code)
+      let verified_coupon;
+      const existing_promo_code: Stripe.PromotionCode | null = existing_incentive?.promo_codes ? existing_incentive?.promo_codes[0] : null;
+      // First, does the coupon need to be updated or created?
+      if (existing_incentive.coupon) {
+        console.log("existing_incentive.coupon", existing_incentive.coupon)
+        // Did the user make any changes to the coupon?
+        if (JSON.stringify(existing_incentive.coupon) === JSON.stringify(coupon)) {
+          console.log("coupons match")
+          // Coupons match so no update to the coupon is needed
+          // Check to see if the promo_code needs and update
+          if (existing_promo_code?.code !== promo_code?.code) {
+            console.log("promos don't match")
+            // Promo codes don't match so we'll need to deactivate the first and add the second
+            if (existing_promo_code && existing_promo_code.id) {
+              console.log("we have an old promo to deactivate")
+              const deactivated_code = await deactivate_stripe_promo_code(existing_promo_code.id)
+            };
+            const new_promo_code = await create_stripe_promo_code(customer_id, promo_code?.code)
+          }
+        } else { // There are some changes to save. So delete and recreate
+          console.log("coupon don't match")
+          if (existing_incentive && existing_incentive.coupon && existing_incentive.coupon.id === customer_id) {
+            const deleted = await delete_stripe_coupon(existing_incentive.coupon.id)
+            verified_coupon = await create_stripe_coupon(customer_id, coupon)
+            console.log("coupon was deleted and the new one added", verified_coupon)
+            // Now that we have a new coupon, we need to deactivate the old promo and add the new promo (even if the code has remained the same)
+            if (existing_promo_code && existing_promo_code.id) {
+              const deactivated_code = await deactivate_stripe_promo_code(existing_promo_code.id)
+            };
+            const new_promo_code = await create_stripe_promo_code(customer_id, promo_code?.code)
+          }
+          
+        }
+      } else { // If no coupon exists with this customer ID, create it
+        console.log("no coupon existed so we can save a new coupon and a new promo")
+        verified_coupon = await create_stripe_coupon(customer_id, coupon)
+        const new_promo_code = await create_stripe_promo_code(customer_id, promo_code?.code)
+      }
+      
       const metadata = {
-        raf_promo_code: promo_code.code,
-        raf_incentive_type: incentive_structure.incentive_type,
-        raf_incentive_amount: incentive_structure.incentive_amount,
-        raf_incentive_currency: incentive_structure.incentive_currency,
-        raf_reward_amount: incentive_structure.reward_amount,
-        raf_reward_currency: incentive_structure.reward_currency
+        raf_promo_code: promo_code?.code,
+        raf_reward_amount: reward.reward_amount,
+        raf_reward_currency: reward.reward_currency
       }
       const updated_customer = await add_stripe_metadata_to_customer(customer_id, metadata)
-      showToast("Invoice updated", {type: "success"})
-      console.log('updated_customer', updated_customer)
+      showToast("Customer Updated!", {type: "success"})
+      onSave();
     } catch (err) {
       set_error(process_error(err))
-      showToast("Invoice could not be updated", {type: "caution"})
+      showToast("Coupon could not be updated", {type: "caution"})
     }
+  }
+
+  function save_promo_code_handler(new_promo: string) {
+    set_promo_code({code: new_promo})
+    update_step_handler(step, 2)
+    showToast("Promo code set!", {type: "success"})
+  }
+
+  function save_reward_handler(new_reward: IReward) {
+    set_reward(new_reward)
+    // set_reward_currency(new_reward.reward_currency)
+    // set_reward_amount(new_reward.reward_amount)
+    update_step_handler(step, 3)
+    showToast("Reward set!", {type: "success"})
+  }
+
+  function save_coupon_handler(new_coupon: ICoupon) {
+    set_coupon(new_coupon)
+    if (reward && promo_code && new_coupon) {
+      save_incentive_structure(existing_incentive, reward, promo_code, new_coupon, customer.id)
+    } else (showToast("Missing section!", {type: "caution"}))
     
-   
+    showToast("Incentive created", {type: "success"})
   }
 
   return (
     <FocusView 
       title="Create reward incentive" 
-      confirmCloseMessages={confirmClose ? confirmCloseMessages : undefined}
-      shown={show_focus}>
+      confirmCloseMessages={confirm_close_messages}
+      shown={show_focus}
+      setShown={(shown: boolean)=>{set_show_focus(false), onBack()}}
+      >
       <Inline css={{font: 'subheading'}}>Step {step} of 3</Inline>
       { error ? <ErrorComponent error_title={error?.error_title} error_message={error?.error_message} type={error?.type}></ErrorComponent> : null }
-
+      
       {step === 1 ? 
       <>
-        <Box css={{marginY: 'medium'}}>
-          <TextField 
-            label="Promotion Code" 
-            description="This is the unique promotion code for this customer to refer their friends." 
-            type="text" 
-            error={promo_code_exists ? "This promotion code already exists. Please choose a unique code." : undefined}
-            autoFocus={true}
-            defaultValue={promo_code}
-            placeholder="Promo Code" 
-            css={{width: 'fill'}} 
-            onChange={(e)=>{set_promo_code(e.target.value); check_promo_code_exists_handler(e.target.value)}}/>
-        </Box>
-        {/* {promo_code_exists ?  <Inline css={{font: 'body', color: 'attention', fontWeight: 'semibold'}}>This promotion code already exists. Please choose a unique code.</Inline> : null} */}
-        <Box css={{
-          background: "container",
-          borderRadius: "medium",
-          marginY: "medium",
-          padding: "large",
-        }}>
-          <Inline css={{font: 'body', color: 'primary', fontWeight: 'semibold'}}>Example: </Inline>
-          Adding a promotion code like, MEGSPING20, will allow your customer to send that code to a friend the earn a reward.
-        </Box>
-        
-        <ButtonGroup>
-          <Button onPress={() => { update_step_handler(step, -1) }} > <Icon name="arrowLeft" size="xsmall" /> Back</Button>
-          <Button type="primary" onPress={() => {update_step_handler(step, 1)}} >Next</Button>
-       </ButtonGroup>
-
-      
+        <CreateEditPromoCode existing_promo_codes={existing_incentive.promo_codes} on_next={(new_promo) => save_promo_code_handler(new_promo) }></CreateEditPromoCode>
       </>
       : null }
 
       {step === 2 ?   
       <>
-      
-        {/* <Box>How much account credit should this customer earn when they successfully refer a friend?</Box> */}
-        <Box css={{ stack: 'x', gap: 'medium', marginY: 'medium' }}>
-          <TextField 
-            form="credit_form" 
-            label="Reward Credit" 
-            description="Account credit for the referring customer" 
-            type="number" 
-            defaultValue={reward_amount}
-            required={true}
-            placeholder="Reward Credit" 
-            css={{width: '1/3'}} 
-            onChange={(e)=>set_reward_amount(e.target.value)}/>
-
-          <Select
-            css={{width: '1/4'}}
-            name="currency"
-            label="Currency"
-            description="Currency of the account credit" 
-            defaultValue={reward_currency}
-            onChange={(e) => {
-              set_reward_currency(e.target.value)
-            }}
-          >
-            <option value="">Choose an option</option>
-            <option value="usd">USD</option>
-            <option value="eur">EUR</option>
-          </Select>
-        </Box>
-
-        <Box css={{
-          background: "container",
-          borderRadius: "medium",
-          marginY: "medium",
-          padding: "large",
-        }}>
-          <Inline css={{font: 'body', color: 'primary', fontWeight: 'semibold'}}>Example: </Inline>
-           When a customer uses this promotion code and makes a successfull payment, this account credit will be applied to the refering customer.
-        </Box>
-        
-        <ButtonGroup>
-          <Button onPress={() => { update_step_handler(step, -1) }} > <Icon name="arrowLeft" size="xsmall" /> Back</Button>
-          <Button type="primary" onPress={() => {update_step_handler(step, 1)}} >Next</Button>
-        </ButtonGroup>
+        <CreateEditReward existing_reward={reward} customer_currency={customer.currency} on_next={(new_reward: IReward) => save_reward_handler(new_reward)} on_back={() => update_step_handler(step, 1)}></CreateEditReward>
       </>
       : null }
 
       {step === 3 ? 
         <>
-        <Box css={{
+
+        <CreateEditCoupon existing_coupon={existing_incentive.coupon} customer_currency={customer.currency} on_next={(new_coupon: ICoupon) => save_coupon_handler(new_coupon)} on_back={() => update_step_handler(step, 2)}></CreateEditCoupon>
+        {/* <Box css={{
             font: 'body',
             fontWeight: 'semibold',
             color: 'primary',
@@ -244,7 +255,6 @@ const CreateIncentive = ({ shown, incentive, onSave, onBack, userContext, enviro
           </FormFieldGroup>  
         </Box>
             
-            {/* AMOUNT OFF */}
             {incentive_type === "AMOUNT_OFF" ? (
               <Box css={{ stack: 'x', gap: 'medium', marginY: 'medium' }}> 
 
@@ -262,8 +272,9 @@ const CreateIncentive = ({ shown, incentive, onSave, onBack, userContext, enviro
                   name="demo-001"
                   label="Currency"
                   description="Choose from list" 
-                  defaultValue={incentive_currency}
+                  // defaultValue={incentive_currency}
                   css={{width: '1/4'}}
+                  required={true}
                   onChange={(e) => {
                     console.log(e);
                     set_incentive_currency(e.target.value)
@@ -276,7 +287,6 @@ const CreateIncentive = ({ shown, incentive, onSave, onBack, userContext, enviro
               </Box>
             )  : null}
         
-            {/* PERCENT OFF */}
             {incentive_type === "PERCENT_OFF" ? (
               <Box>
                 <Box css={{marginY: 'medium'}} >
@@ -284,6 +294,8 @@ const CreateIncentive = ({ shown, incentive, onSave, onBack, userContext, enviro
                   label="Percent Discount" 
                   description="Must be a whole number" 
                   type="number" 
+                  defaultValue={incentive_amount}
+                  required={true}
                   placeholder="Discount Percentage" 
                   css={{width: 'fill'}} 
                   onChange={(e)=>set_incentive_amount(e.target.value)}/>
@@ -302,13 +314,24 @@ const CreateIncentive = ({ shown, incentive, onSave, onBack, userContext, enviro
             </Box>
             
             <ButtonGroup >
-              <Button onPress={() => { update_step_handler(step, -1) }} > <Icon name="arrowLeft" size="xsmall" /> Back</Button>
-              <Button type="primary" onPress={() => {save_incentive_structure(coupon, {reward_amount, incentive_type, reward_currency, incentive_amount, incentive_currency, promo_code}); set_show_focus(false)}} >Save</Button>
-            </ButtonGroup>
+              <Button onPress={() => { update_step_handler(step, 2) }} > <Icon name="arrowLeft" size="xsmall" /> Back</Button>
+              <Button type="primary" onPress={() => {save_incentive_structure(coupon, {reward_amount, incentive_type, reward_currency, incentive_amount, incentive_currency, promo_code}); set_show_focus(false); onBack();}} >Save</Button>
+            </ButtonGroup> */}
               </>
       : null }
 
-    
+      <Box css={{
+          background: "container",
+          borderRadius: "medium",
+          marginY: "medium",
+          padding: "large",
+        }}>
+        <Inline css={{font: 'body', color: 'primary', fontWeight: 'semibold'}}>Example: </Inline>
+          When a new customer uses this promotion code, <Inline css={{fontWeight: 'semibold'}}>{promo_code ? promo_code?.code+',': ''}</Inline> they will recieve a discount 
+          { coupon?.percent_off ? <> of <Inline css={{fontWeight: 'semibold'}}>{coupon?.percent_off}% off</Inline></>: null}
+          { coupon?.amount_off ? <> of <Inline css={{fontWeight: 'semibold'}}>{coupon?.amount_off}{coupon?.currency} off</Inline></>: null}.
+          When that customer makes a successfull payment, <Inline css={{fontWeight: 'semibold'}}>{customer.name}</Inline> will earn a <Inline css={{fontWeight: 'semibold'}}>{reward?.reward_amount} {reward?.reward_currency}</Inline> account credit.
+      </Box>
   </FocusView>
 )};
 

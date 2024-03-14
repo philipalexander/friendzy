@@ -14,7 +14,7 @@ import { IUser } from "./util/UserService";
 import ErrorComponent, { ErrorProps } from "./components/error";
 import { process_error } from "./util/error_service";
 
-const AppSettings = ({userContext, environment, oauthContext}: ExtensionContextValue) => {
+const AppSettings = ({userContext, environment, oauthContext, appContext}: ExtensionContextValue) => {
   const [status, setStatus] = useState('');
   const [auth_url, set_auth_url] = useState('');
   const [error, set_error] = useState<ErrorProps | null>(null);
@@ -24,7 +24,7 @@ const AppSettings = ({userContext, environment, oauthContext}: ExtensionContextV
 
   useEffect(() => {
     try {
-      is_authenticated({userContext, environment, oauthContext}).then((authenticated_user: any) => {
+      is_authenticated({userContext, environment, oauthContext, appContext}).then((authenticated_user: any) => {
         set_signed_in(true)
         set_friendzy_user({...authenticated_user})
       }).catch(error => {
@@ -43,7 +43,6 @@ const AppSettings = ({userContext, environment, oauthContext}: ExtensionContextV
   }, []);
  
   const saveSettings = async (values: any) => {
-    console.log("saveSettings is not implemented");
     try {
       setStatus('Saving...');
       // Extract our fields from the values object. The key is the name attribute of the form element.

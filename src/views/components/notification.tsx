@@ -1,4 +1,4 @@
-import { Banner } from "@stripe/ui-extension-sdk/ui";
+import { Banner, Box } from "@stripe/ui-extension-sdk/ui";
 
 export type NotificationProps = {
   title: string;
@@ -7,9 +7,8 @@ export type NotificationProps = {
 };
 
 const NotificationComponent = ({ title, message, type }: NotificationProps) => {
-  console.log('Notification', title, message)
   return (
-    <>
+    <Box css={{marginY: 'small'}}>
       <Banner
         type={type}
         title={title}
@@ -18,7 +17,7 @@ const NotificationComponent = ({ title, message, type }: NotificationProps) => {
         //   <Button onPress={() => console.log('hello world')}>Update bank account</Button>
         // }
       />
-    </>
+    </Box>
 )};
 
 export default NotificationComponent;
